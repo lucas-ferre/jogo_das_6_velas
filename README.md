@@ -114,7 +114,7 @@ Para simular a escuridao do salao e o campo de visao das chamas:
 ### Vidraca Gotica & Nuvens Procedurais
 * **Geometria de Mascara:** Arco semicircular esticado recortado atraves de `pygame.draw.ellipse` e `pygame.draw.rect` aplicado com `BLEND_RGBA_MIN`.
 * **Paralaxe Continuo:** Tres camadas de nuvens (`cloud_col_back`, `cloud_col_mid`, `cloud_col_fore`) deslocadas por funcoes lineares continuas moduladas no tempo (`t = time_elapsed`), operando a 60 FPS independentemente do avanco de turnos do jogador.
-* **Trajetoria Celestial:** A posicao da Lua e calculada por interpolacao parabolica `(x, y) = f(prog, t)`:
+* **Trajetoria Celestial:** A posicao da Lua e calculada por interpolacao parabolica $(x, y) = f(\text{prog}, t)$:
   $$x = 50 + \text{prog} \cdot (W - 100) + 7 \cdot \sin(0.7t)$$
   $$y = 92 - 44 \cdot \sin(\text{prog} \cdot \pi) + 4 \cdot \cos(0.5t)$$
 
@@ -124,9 +124,9 @@ Para simular a escuridao do salao e o campo de visao das chamas:
 
 O modulo [`sound_manager.py`](sound_manager.py) sintetiza todos os efeitos sonoros da partida em tempo de execucao via **NumPy**, sem depender de arquivos `.wav` ou `.mp3` no disco:
 
-* **Taxa de Amostragem:** $22.050\text{ Hz}$, $16\text{-bit signed mono}$.
+* **Taxa de Amostragem:** 22.050 Hz, 16-bit signed mono.
 * **Formas de Onda:**
-  * **Onda Quadrada (Square):** $\text{sign}(\sin(2\pi f t))$
+  * **Onda Quadrada (Square):** $\operatorname{sign}(\sin(2\pi f t))$
   * **Onda Dente de Serra (Sawtooth):** $2(f t - \lfloor f t + 0.5 \rfloor)$
   * **Onda Senoidal Pura (Sine):** $\sin(2\pi f t)$
   * **Ruido Branco (Noise):** Distribuicao uniforme $U(-1, 1)$
@@ -138,11 +138,11 @@ O modulo [`sound_manager.py`](sound_manager.py) sintetiza todos os efeitos sonor
 
 A simulacao de turnos em [`game_engine.py`](game_engine.py) opera de forma deterministica:
 
-1. **Decaimento Dinamico:** A cada acao que consome turno, as velas ativas reduzem em $1$ turno de queima (exceto sob travas de congelamento como *Lampiao Espectral*, *Eclipse Prateado* ou *Super Queima da Lanterna*).
+1. **Decaimento Dinamico:** A cada acao que consome turno, as velas ativas reduzem em 1 turno de queima (exceto sob travas de congelamento como *Lampiao Espectral*, *Eclipse Prateado* ou *Super Queima da Lanterna*).
 2. **Piso Minimo de Duracao:** Ao reacender uma pilastra, a nova duracao e calculada dinamicamente:
-   $$\text{duracao} = \max(\text{min\_floor}, \text{base\_burn} - \text{extinguished\_count} + \text{bonuses})$$
+   $$\text{duracao} = \max(\text{piso minimo}, \text{queima base} - \text{apagadas} + \text{bonus})$$
 3. **Aproximacao da Criatura:**
-   $$\text{target\_proximity} = \frac{\max(0, \text{extinguished} - \text{purged})}{6} \times \text{stealth\_rate}$$
+   $$\text{proximidade} = \frac{\max(0, \text{apagadas} - \text{expurgos})}{6} \times \text{taxa de furtividade}$$
    O deslocamento dos olhos das criaturas no salao interpola continuamente em direcao ao Altar Central via aproximacao assintotica.
 
 ---
