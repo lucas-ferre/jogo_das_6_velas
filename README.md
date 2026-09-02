@@ -6,12 +6,12 @@ Para instruções de gameplay, arquétipos e regras de jogo, consulte o [GUIA_DE
 
 ---
 
-## 🎥 Demonstração Visual
+## Demonstração Visual
 
-### 🖼️ Tela Inicial
+### Tela Inicial
 ![Tela Inicial do Ritual das 6 Velas](tela%20inicial.gif)
 
-### 🎮 Exemplo de Gameplay
+### Exemplo de Gameplay
 <video src="exemplo%20de%20gameplay.mp4" width="100%" controls></video>
 
 ---
