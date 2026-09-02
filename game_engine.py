@@ -36,6 +36,7 @@ class GameEngine:
         self.silver_burst = 0.0
         self.camera_flash = 0.0
         self.purge_burst = 0.0
+        self.screen_shake_trigger = 0.0
         self.beam_target = None
         self.beam_timer = 0.0
         self.difficulty = difficulty
@@ -156,18 +157,23 @@ class GameEngine:
             frozen_pillar_id = int(self.player.current_location)
 
         has_perp = (self.player.blessing.type == "FIRE")
+        just_extinguished = False
         for pillar in self.pillars:
             if pillar.candle.is_lit:
                 if frozen_pillar_id is not None and pillar.id == frozen_pillar_id:
                     continue
                 pillar.candle.tick(has_perpetual_fire=has_perp)
                 if not pillar.candle.is_lit:
+                    just_extinguished = True
                     self.add_log(f"A vela {self.get_pillar_label(pillar.id)} apagou!")
                     if self.player.blessing.type == "WILL_O_WISP":
                         max_wisps = self.player.max_inventory
                         if self.will_o_wisps < max_wisps:
                             self.will_o_wisps += 1
                             self.add_log(f"Fogo Fátuo: 1 chama espiritual absorvida ({self.will_o_wisps}/{max_wisps})!")
+
+        if just_extinguished:
+            self.screen_shake_trigger = max(self.screen_shake_trigger, 4.5)
 
         ext_count = self.extinguished_count
         purged = self.player.persona.purged_creatures
@@ -177,6 +183,7 @@ class GameEngine:
             if self.adrenaline_ready and self.active_candles_count <= 2 and ext_count < len(self.pillars):
                 self.adrenaline_ready = False
                 self.adrenaline_moves_left = 2
+                self.screen_shake_trigger = max(self.screen_shake_trigger, 6.0)
                 self.add_log("Sobrecarga de Adrenalina ativada! Seus próximos 2 movimentos não gastam turnos!")
             elif not self.adrenaline_ready and self.active_candles_count >= 4:
                 self.adrenaline_ready = True
@@ -185,6 +192,7 @@ class GameEngine:
         if ext_count == len(self.pillars):
             if self.player.artifact.type == "CROSS" and self.player.artifact.trigger_cross():
                 self.silver_burst = 1.0
+                self.screen_shake_trigger = 9.5
                 self.creature.target_proximity = 0.2
                 ext_pillars = [p for p in self.pillars if not p.candle.is_lit]
                 revived = 0
@@ -196,6 +204,7 @@ class GameEngine:
                     self.turn += 1
             elif self.player.artifact.type == "CAMERA" and self.player.artifact.use_camera_charge():
                 self.camera_flash = 1.0
+                self.screen_shake_trigger = 5.5
                 self.creature.target_proximity = 0.5
                 self.add_log(f"Flash da Câmera disparado ({self.player.artifact.charges} restantes)! Ação permitida nas sombras.")
                 if consume_turn:
@@ -203,6 +212,7 @@ class GameEngine:
             else:
                 self.creature.update_target(ext_count, len(self.pillars), purged, is_stealth)
                 self.game_over = True
+                self.screen_shake_trigger = 8.0
                 self.add_log("Todas as velas se apagaram. A criatura consumiu o salão.")
         else:
             self.creature.update_target(ext_count, len(self.pillars), purged, is_stealth)
@@ -436,6 +446,7 @@ class GameEngine:
 
         self.beam_target = pillar_id
         self.beam_timer = 1.0
+        self.screen_shake_trigger = 3.5
         
         lock_msg = " [Decaimento travado por 2 rodadas!]" if pillar.candle.freeze_turns_left > 0 else ""
         self.add_log(f"Feixe da Lanterna: {self.get_pillar_label(pillar_id)} (+{power}t, total {pillar.candle.turns_left}t){lock_msg}.")
@@ -466,6 +477,7 @@ class GameEngine:
                 self.creature.target_proximity = max(0.0, self.creature.target_proximity - 0.5)
                 p.light_prayer_turns = 3
                 p.cooldown = p.max_cooldown
+                self.screen_shake_trigger = 6.0
                 self.add_log("Prece da Luz: Vela sacrificada! As sombras foram repelidas por 3 turnos.")
                 return True
             else:
@@ -481,6 +493,7 @@ class GameEngine:
                 self.player.pos_y = float(CENTER_POSITION[1])
                 added = self.player.restock() if self.altar_disabled_turns == 0 else 0
                 p.cooldown = p.max_cooldown
+                self.screen_shake_trigger = 4.0
                 if self.altar_disabled_turns > 0:
                     self.add_log("Sprint de Fuga: Você correu direto ao Altar Central (Altar exausto)!")
                 else:
@@ -494,11 +507,13 @@ class GameEngine:
             p.purged_creatures += 1
             p.cooldown = p.max_cooldown
             self.purge_burst = 1.0
+            self.screen_shake_trigger = 8.5
             self.creature.target_proximity = max(0.0, self.creature.target_proximity - 0.3)
             self.add_log(f"Julgamento Sagrado: 1 criatura expurgada permanentemente (+1t mínimo fixo, Total: {p.purged_creatures})!")
             if p.purged_creatures >= 5:
                 self.victory = True
                 self.game_over = True
+                self.screen_shake_trigger = 10.0
                 self.victory_reason = "Todas as 5 criaturas das sombras foram expurgadas pelo Julgamento Sagrado!"
                 self.add_log("VITÓRIA SAGRADA! A 5ª criatura foi expurgada! O salão foi completamente purificado!")
             return True
@@ -509,6 +524,7 @@ class GameEngine:
                     if pl.candle.is_lit:
                         pl.candle.freeze_turns_left = max(pl.candle.freeze_turns_left, 2)
                 p.cooldown = p.max_cooldown
+                self.screen_shake_trigger = 6.0
                 self.add_log("Eclipse Prateado: O tempo de queima de todas as velas foi congelado por 2 rodadas!")
                 return True
             else:

@@ -207,6 +207,9 @@ def main():
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
+                    def go_to_state(target, cb=None):
+                        renderer.start_fade_transition(target, cb)
+
                     if current_state == STATE_MENU:
                         btn_w, btn_h = 320, 50
                         btn_x = WINDOW_WIDTH // 2 - btn_w // 2
@@ -217,13 +220,13 @@ def main():
 
                         if start_rect.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            current_state = STATE_PERSONA_SELECT
+                            go_to_state(STATE_PERSONA_SELECT)
                         elif upg_rect.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_UPGRADES
+                            go_to_state(STATE_UPGRADES)
                         elif set_rect.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_SETTINGS
+                            go_to_state(STATE_SETTINGS)
                         elif exit_rect.collidepoint(event.pos):
                             running = False
 
@@ -248,10 +251,10 @@ def main():
 
                         if fwd_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            current_state = STATE_ARTIFACT_SELECT
+                            go_to_state(STATE_ARTIFACT_SELECT)
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_MENU
+                            go_to_state(STATE_MENU)
 
                     elif current_state == STATE_ARTIFACT_SELECT:
                         card_w, card_h = 175, 135
@@ -278,10 +281,10 @@ def main():
 
                         if fwd_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            current_state = STATE_BLESSING_SELECT
+                            go_to_state(STATE_BLESSING_SELECT)
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_PERSONA_SELECT
+                            go_to_state(STATE_PERSONA_SELECT)
 
                     elif current_state == STATE_BLESSING_SELECT:
                         card_w, card_h = 175, 135
@@ -305,10 +308,10 @@ def main():
 
                         if start_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            current_state = STATE_RITUAL_SUMMARY
+                            go_to_state(STATE_RITUAL_SUMMARY)
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_ARTIFACT_SELECT
+                            go_to_state(STATE_ARTIFACT_SELECT)
 
                     elif current_state == STATE_RITUAL_SUMMARY:
                         back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 310, WINDOW_HEIGHT - 68, 290, 44)
@@ -316,17 +319,16 @@ def main():
 
                         if start_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing)
-                            current_state = STATE_PLAYING
+                            go_to_state(STATE_PLAYING, lambda: engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing))
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_BLESSING_SELECT
+                            go_to_state(STATE_BLESSING_SELECT)
 
                     elif current_state == STATE_UPGRADES:
                         back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 140, WINDOW_HEIGHT - 68, 280, 42)
                         if back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_MENU
+                            go_to_state(STATE_MENU)
 
                     elif current_state == STATE_SETTINGS:
                         panel_x = WINDOW_WIDTH // 2 - 360
@@ -371,7 +373,7 @@ def main():
                             sound_mgr.play("menu_select")
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_MENU
+                            go_to_state(STATE_MENU)
 
                     elif current_state == STATE_PLAYING:
                         if engine.game_over:
@@ -417,14 +419,13 @@ def main():
 
                         if restart_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing)
-                            current_state = STATE_PLAYING
+                            go_to_state(STATE_PLAYING, lambda: engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing))
                         elif change_art_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_PERSONA_SELECT
+                            go_to_state(STATE_PERSONA_SELECT)
                         elif menu_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            current_state = STATE_MENU
+                            go_to_state(STATE_MENU)
 
                 elif event.button == 3:
                     if current_state == STATE_PLAYING and not engine.game_over:
@@ -600,14 +601,18 @@ def main():
         if current_state == STATE_PLAYING:
             if engine.extinguished_count > prev_ext_count:
                 sound_mgr.play("candle_out")
+                sound_mgr.play("screen_impact")
             if engine.silver_burst > 0.0 and prev_burst == 0.0:
                 sound_mgr.play("divine_cross")
+                sound_mgr.play("screen_impact")
             if engine.purge_burst > 0.0 and prev_purge == 0.0:
                 sound_mgr.play("divine_cross")
+                sound_mgr.play("screen_impact")
             if engine.camera_flash > 0.0 and prev_flash == 0.0:
                 sound_mgr.play("flash")
             if engine.game_over and not prev_game_over:
                 sound_mgr.play("game_over")
+                sound_mgr.play("screen_impact")
 
         if current_state == STATE_MENU:
             renderer.update_animation(dt, engine)
@@ -635,6 +640,10 @@ def main():
             renderer.render_gameplay(engine, mouse_pos)
             if engine.game_over and current_state != STATE_GAME_OVER:
                 current_state = STATE_GAME_OVER
+
+        # Update smooth screen transitions & overlay
+        current_state, _ = renderer.update_fade(dt, current_state)
+        renderer.draw_fade_overlay()
 
         pygame.display.flip()
 

@@ -89,10 +89,73 @@ class Renderer:
         self.player_visual_x = float(CENTER_POSITION[0])
         self.player_visual_y = float(CENTER_POSITION[1])
 
+        self.world_surf = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.screen_shake = 0.0
+        self.shake_offset = (0, 0)
+
+        self.fade_alpha = 0.0
+        self.fade_state = "IDLE"
+        self.fade_target_state = None
+        self.fade_callback = None
+        self.fade_speed = 750.0
+
+    def trigger_shake(self, intensity=6.0):
+        self.screen_shake = max(self.screen_shake, intensity)
+
+    def start_fade_transition(self, target_state, on_middle_callback=None):
+        if self.fade_state == "IDLE":
+            self.fade_state = "FADING_OUT"
+            self.fade_alpha = 0.0
+            self.fade_target_state = target_state
+            self.fade_callback = on_middle_callback
+
+    def update_fade(self, dt, current_state):
+        if self.fade_state == "FADING_OUT":
+            self.fade_alpha = min(255.0, self.fade_alpha + dt * self.fade_speed)
+            if self.fade_alpha >= 255.0:
+                self.fade_alpha = 255.0
+                new_state = self.fade_target_state if self.fade_target_state is not None else current_state
+                if self.fade_callback:
+                    self.fade_callback()
+                    self.fade_callback = None
+                self.fade_state = "FADING_IN"
+                return new_state, True
+            return current_state, True
+        elif self.fade_state == "FADING_IN":
+            self.fade_alpha = max(0.0, self.fade_alpha - dt * self.fade_speed)
+            if self.fade_alpha <= 0.0:
+                self.fade_alpha = 0.0
+                self.fade_state = "IDLE"
+                self.fade_target_state = None
+                return current_state, False
+            return current_state, True
+        return current_state, False
+
+    def draw_fade_overlay(self):
+        if self.fade_alpha > 0.0:
+            fade_surf = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+            fade_surf.fill((0, 0, 0, int(self.fade_alpha)))
+            self.screen.blit(fade_surf, (0, 0))
+
     def update_animation(self, dt, engine):
         self.time_elapsed += dt
         engine.update_timers(dt)
         engine.creature.update(dt)
+
+        # Process screen shake from engine
+        if hasattr(engine, 'screen_shake_trigger') and engine.screen_shake_trigger > 0.0:
+            self.trigger_shake(engine.screen_shake_trigger)
+            engine.screen_shake_trigger = 0.0
+
+        if self.screen_shake > 0.0:
+            self.screen_shake = max(0.0, self.screen_shake - dt * 14.0)
+            amt = self.screen_shake
+            self.shake_offset = (
+                int(random.uniform(-amt, amt)),
+                int(random.uniform(-amt, amt))
+            )
+        else:
+            self.shake_offset = (0, 0)
 
         target_x, target_y = CENTER_POSITION
         if engine.player.current_location != "CENTER":
@@ -107,19 +170,36 @@ class Renderer:
         for pillar in engine.pillars:
             if pillar.candle.is_lit:
                 px, py = pillar.position
-                if random.random() < 0.35:
-                    jitter = random.uniform(-4, 4)
-                    speed_y = random.uniform(-25, -10)
-                    life = random.uniform(0.4, 0.8)
+                c_state = pillar.candle.state
+                is_frozen = (engine.player.artifact.type == "LANTERN" and engine.player.current_location == str(pillar.id))
+                is_embers = (pillar.candle.latent_embers > 0)
+                has_lock = (pillar.candle.freeze_turns_left > 0)
+
+                spawn_chance = 0.50 if (is_embers or c_state == "BRIGHT") else 0.35
+                if random.random() < spawn_chance:
+                    jitter = random.uniform(-5, 5)
+                    speed_y = random.uniform(-38, -16)
+                    life = random.uniform(0.6, 1.3)
+                    
+                    if is_frozen:
+                        p_type = "CYAN"
+                    elif is_embers:
+                        p_type = "RED"
+                    elif has_lock:
+                        p_type = "GOLD"
+                    else:
+                        p_type = "EMBER"
+
                     self.particles.append({
                         "x": px + jitter,
-                        "y": py - 28,
-                        "vx": jitter * 0.5,
+                        "y": py - 32,
+                        "vx": jitter * 0.4 + random.uniform(-3, 3),
                         "vy": speed_y,
+                        "seed": random.uniform(0, 6.28),
                         "life": life,
                         "max_life": life,
-                        "size": random.uniform(2.0, 4.0),
-                        "type": "FIRE"
+                        "size": random.uniform(2.0, 3.8),
+                        "type": p_type
                     })
 
         if engine.player.artifact.type == "LANTERN":
@@ -130,9 +210,10 @@ class Renderer:
                     "x": lx,
                     "y": ly,
                     "vx": random.uniform(-6, 6),
-                    "vy": random.uniform(-18, -8),
-                    "life": 0.6,
-                    "max_life": 0.6,
+                    "vy": random.uniform(-20, -10),
+                    "seed": random.uniform(0, 6.28),
+                    "life": 0.65,
+                    "max_life": 0.65,
                     "size": random.uniform(2.0, 3.5),
                     "type": "CYAN"
                 })
@@ -1597,7 +1678,10 @@ class Renderer:
         self.draw_button(back_btn, "VOLTAR AO MENU", back_btn.collidepoint(mouse_pos))
 
     def render_gameplay(self, engine, mouse_pos):
-        self.screen.fill(COLOR_BG)
+        self.world_surf.fill(COLOR_BG)
+        orig_screen = self.screen
+        self.screen = self.world_surf
+
         self.draw_floor()
         self.draw_gothic_window(engine)
         self.draw_corridors()
@@ -1611,6 +1695,11 @@ class Renderer:
         self.draw_silver_burst(engine)
         self.draw_camera_flash(engine)
         self.draw_purge_burst(engine)
+
+        self.screen = orig_screen
+        self.screen.fill(COLOR_BG)
+        self.screen.blit(self.world_surf, self.shake_offset)
+
         self.draw_hud(engine, mouse_pos)
 
         if engine.game_over:
@@ -2072,15 +2161,39 @@ class Renderer:
             self.screen.blit(st_surf, (px - st_surf.get_width() // 2, py + 42))
 
     def draw_particles(self):
+        t = self.time_elapsed
         for p in self.particles:
             alpha_ratio = p["life"] / p["max_life"]
             size = max(1.0, p["size"] * alpha_ratio)
             col_val = int(255 * alpha_ratio)
-            if p["type"] == "FIRE":
-                col = (col_val, int(col_val * 0.6), int(col_val * 0.2))
+            
+            draw_x = int(p["x"] + math.sin(t * 4.5 + p.get("seed", 0.0)) * 3.5)
+            draw_y = int(p["y"])
+
+            if p["type"] == "EMBER":
+                core_col = (255, min(255, int(col_val * 0.85)), int(col_val * 0.25))
+                halo_col = (255, int(col_val * 0.5), int(col_val * 0.1), int(col_val * 0.35))
+                h_rad = int(size * 2.5)
+                halo_surf = pygame.Surface((h_rad * 2, h_rad * 2), pygame.SRCALPHA)
+                pygame.draw.circle(halo_surf, halo_col, (h_rad, h_rad), h_rad)
+                self.screen.blit(halo_surf, (draw_x - h_rad, draw_y - h_rad))
+                pygame.draw.circle(self.screen, core_col, (draw_x, draw_y), max(1, int(size)))
+            elif p["type"] == "GOLD":
+                core_col = (255, 235, 120)
+                pygame.draw.circle(self.screen, core_col, (draw_x, draw_y), max(1, int(size)))
+            elif p["type"] == "RED":
+                core_col = (239, 68, 68)
+                pygame.draw.circle(self.screen, core_col, (draw_x, draw_y), max(1, int(size)))
+            elif p["type"] == "CYAN":
+                core_col = (56, 189, 248)
+                h_rad = int(size * 2.0)
+                halo_surf = pygame.Surface((h_rad * 2, h_rad * 2), pygame.SRCALPHA)
+                pygame.draw.circle(halo_surf, (56, 189, 248, int(col_val * 0.3)), (h_rad, h_rad), h_rad)
+                self.screen.blit(halo_surf, (draw_x - h_rad, draw_y - h_rad))
+                pygame.draw.circle(self.screen, core_col, (draw_x, draw_y), max(1, int(size)))
             else:
-                col = (int(col_val * 0.3), int(col_val * 0.8), col_val)
-            pygame.draw.circle(self.screen, col, (int(p["x"]), int(p["y"])), int(size))
+                col = (col_val, int(col_val * 0.6), int(col_val * 0.2))
+                pygame.draw.circle(self.screen, col, (draw_x, draw_y), int(size))
 
     def draw_player(self, engine):
         px = int(self.player_visual_x)

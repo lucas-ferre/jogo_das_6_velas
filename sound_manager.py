@@ -131,3 +131,7 @@ class SoundManager:
 
         s_over = chord([300, 280], 0.15) + chord([250, 230], 0.15) + chord([200, 180], 0.35)
         self.sounds["game_over"] = self.create_sound(s_over)
+
+        # Deep low-frequency tactile impact rumble
+        s_impact = sawtooth_wave(85, 32, 0.22) + square_wave(45, 0.18)
+        self.sounds["screen_impact"] = self.create_sound(s_impact)
