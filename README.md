@@ -12,10 +12,18 @@ Para instrucoes de gameplay, arquetipos e regras de jogo, consulte o [GUIA_DE_CO
 ![Tela Inicial do Ritual das 6 Velas](midia/tela_inicial.gif)
 
 ### Exemplo de Gameplay — Parte 1
-<video src="midia/gameplay_parte_1.mp4" width="100%" controls></video>
+<video src="midia/gameplay_parte_1.mp4" width="100%" controls>
+  Se o reprodutor de video nao carregar, <a href="midia/gameplay_parte_1.mp4">clique aqui para assistir ou baixar o arquivo da Parte 1</a>.
+</video>
+
+> *Nota: Caso o video acima nao seja exibido diretamente pelo navegador, voce pode [abrir ou baixar o arquivo de video da Parte 1 aqui](midia/gameplay_parte_1.mp4).*
 
 ### Exemplo de Gameplay — Parte 2
-<video src="midia/gameplay_parte_2.mp4" width="100%" controls></video>
+<video src="midia/gameplay_parte_2.mp4" width="100%" controls>
+  Se o reprodutor de video nao carregar, <a href="midia/gameplay_parte_2.mp4">clique aqui para assistir ou baixar o arquivo da Parte 2</a>.
+</video>
+
+> *Nota: Caso o video acima nao seja exibido diretamente pelo navegador, voce pode [abrir ou baixar o arquivo de video da Parte 2 aqui](midia/gameplay_parte_2.mp4).*
 
 ---
 
