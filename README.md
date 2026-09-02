@@ -126,7 +126,7 @@ O modulo [`sound_manager.py`](sound_manager.py) sintetiza todos os efeitos sonor
 
 * **Taxa de Amostragem:** 22.050 Hz, 16-bit signed mono.
 * **Formas de Onda:**
-  * **Onda Quadrada (Square):** $\operatorname{sign}(\sin(2\pi f t))$
+  * **Onda Quadrada (Square):** $\text{sgn}(\sin(2\pi f t))$
   * **Onda Dente de Serra (Sawtooth):** $2(f t - \lfloor f t + 0.5 \rfloor)$
   * **Onda Senoidal Pura (Sine):** $\sin(2\pi f t)$
   * **Ruido Branco (Noise):** Distribuicao uniforme $U(-1, 1)$
