@@ -10,6 +10,7 @@ from constants import (
     STATE_PERSONA_SELECT,
     STATE_ARTIFACT_SELECT,
     STATE_BLESSING_SELECT,
+    STATE_MODIFIER_SELECT,
     STATE_RITUAL_SUMMARY,
     STATE_UPGRADES,
     STATE_SETTINGS,
@@ -29,6 +30,9 @@ from constants import (
     BLESSING_THERMAL_BOND,
     BLESSING_WILL_O_WISP,
     BLESSING_SECOND_BREATH,
+    WEATHER_CALM,
+    WEATHER_THUNDERSTORM,
+    WEATHER_BLOOD_RAIN,
     DIFFICULTY_EASY,
     DIFFICULTY_NORMAL,
     DIFFICULTY_HARD,
@@ -63,10 +67,12 @@ def main():
     selected_artifact = "CROSS"
     current_persona = PERSONA_CARETAKER
     selected_blessing = BLESSING_FIRE
+    selected_weather = WEATHER_CALM
+    has_eclipse = False
     current_difficulty = DIFFICULTY_NORMAL
     current_state = STATE_MENU
     
-    engine = GameEngine(selected_artifact, current_persona, current_difficulty, selected_blessing)
+    engine = GameEngine(selected_artifact, current_persona, current_difficulty, selected_blessing, selected_weather, has_eclipse)
     renderer = Renderer(screen)
 
     last_hovered_element = None
@@ -140,6 +146,26 @@ def main():
             elif pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 55, 320, 36).collidepoint(mouse_pos):
                 current_hover = "bless_back"
 
+        elif current_state == STATE_MODIFIER_SELECT:
+            cards_y = 196
+            col_w = 400
+            c1_x = WINDOW_WIDTH // 2 - col_w - 15
+            c2_x = WINDOW_WIDTH // 2 + 15
+            card_h = 75
+            card_gap = 8
+            if pygame.Rect(c1_x, cards_y + 24, col_w, card_h).collidepoint(mouse_pos):
+                current_hover = "mod_calm"
+            elif pygame.Rect(c1_x, cards_y + 24 + card_h + card_gap, col_w, card_h).collidepoint(mouse_pos):
+                current_hover = "mod_storm"
+            elif pygame.Rect(c1_x, cards_y + 24 + (card_h + card_gap) * 2, col_w, card_h).collidepoint(mouse_pos):
+                current_hover = "mod_blood"
+            elif pygame.Rect(c2_x, cards_y + 24, col_w, card_h * 3 + card_gap * 2).collidepoint(mouse_pos):
+                current_hover = "mod_eclipse"
+            elif pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 105, 320, 44).collidepoint(mouse_pos):
+                current_hover = "mod_fwd"
+            elif pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 55, 320, 36).collidepoint(mouse_pos):
+                current_hover = "mod_back"
+
         elif current_state == STATE_RITUAL_SUMMARY:
             back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 310, WINDOW_HEIGHT - 68, 290, 44)
             start_btn = pygame.Rect(WINDOW_WIDTH // 2 + 20, WINDOW_HEIGHT - 68, 290, 44)
@@ -193,6 +219,8 @@ def main():
         prev_burst = engine.silver_burst
         prev_flash = engine.camera_flash
         prev_purge = engine.purge_burst
+        prev_blood = getattr(engine, 'blood_burst', 0.0)
+        prev_lightning = getattr(engine, 'lightning_flash', 0.0)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -308,10 +336,48 @@ def main():
 
                         if start_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            go_to_state(STATE_RITUAL_SUMMARY)
+                            go_to_state(STATE_MODIFIER_SELECT)
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
                             go_to_state(STATE_ARTIFACT_SELECT)
+
+                    elif current_state == STATE_MODIFIER_SELECT:
+                        cards_y = 196
+                        col_w = 400
+                        c1_x = WINDOW_WIDTH // 2 - col_w - 15
+                        c2_x = WINDOW_WIDTH // 2 + 15
+                        card_h = 75
+                        card_gap = 8
+                        rect_calm = pygame.Rect(c1_x, cards_y + 24, col_w, card_h)
+                        rect_storm = pygame.Rect(c1_x, cards_y + 24 + card_h + card_gap, col_w, card_h)
+                        rect_blood = pygame.Rect(c1_x, cards_y + 24 + (card_h + card_gap) * 2, col_w, card_h)
+                        rect_eclipse = pygame.Rect(c2_x, cards_y + 24, col_w, card_h * 3 + card_gap * 2)
+
+                        fwd_btn = pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 105, 320, 44)
+                        back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 55, 320, 36)
+
+                        if rect_calm.collidepoint(event.pos):
+                            selected_weather = WEATHER_CALM
+                            sound_mgr.play("menu_move")
+                        elif rect_storm.collidepoint(event.pos):
+                            selected_weather = WEATHER_THUNDERSTORM
+                            sound_mgr.play("wind_gust")
+                        elif rect_blood.collidepoint(event.pos):
+                            selected_weather = WEATHER_BLOOD_RAIN
+                            has_eclipse = True
+                            sound_mgr.play("blood_strike")
+                        elif rect_eclipse.collidepoint(event.pos):
+                            if selected_weather == WEATHER_BLOOD_RAIN:
+                                sound_mgr.play("screen_impact")
+                            else:
+                                has_eclipse = not has_eclipse
+                                sound_mgr.play("menu_select")
+                        elif fwd_btn.collidepoint(event.pos):
+                            sound_mgr.play("menu_select")
+                            go_to_state(STATE_RITUAL_SUMMARY)
+                        elif back_btn.collidepoint(event.pos):
+                            sound_mgr.play("menu_move")
+                            go_to_state(STATE_BLESSING_SELECT)
 
                     elif current_state == STATE_RITUAL_SUMMARY:
                         back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 310, WINDOW_HEIGHT - 68, 290, 44)
@@ -319,10 +385,10 @@ def main():
 
                         if start_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_select")
-                            go_to_state(STATE_PLAYING, lambda: engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing))
+                            go_to_state(STATE_PLAYING, lambda: engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing, selected_weather, has_eclipse))
                         elif back_btn.collidepoint(event.pos):
                             sound_mgr.play("menu_move")
-                            go_to_state(STATE_BLESSING_SELECT)
+                            go_to_state(STATE_MODIFIER_SELECT)
 
                     elif current_state == STATE_UPGRADES:
                         back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 140, WINDOW_HEIGHT - 68, 280, 42)
@@ -589,7 +655,7 @@ def main():
                 elif current_state == STATE_GAME_OVER:
                     if event.key in (pygame.K_SPACE, pygame.K_r, pygame.K_RETURN):
                         sound_mgr.play("menu_select")
-                        engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing)
+                        engine.reset(selected_artifact, current_persona, current_difficulty, selected_blessing, selected_weather, has_eclipse)
                         current_state = STATE_PLAYING
                     elif event.key in (pygame.K_t, pygame.K_TAB):
                         sound_mgr.play("menu_move")
@@ -599,6 +665,11 @@ def main():
                         current_state = STATE_MENU
 
         if current_state == STATE_PLAYING:
+            if not engine.game_over:
+                sound_mgr.start_weather_ambient(engine.weather_type)
+            else:
+                sound_mgr.stop_weather_ambient()
+
             if engine.extinguished_count > prev_ext_count:
                 sound_mgr.play("candle_out")
                 sound_mgr.play("screen_impact")
@@ -610,9 +681,17 @@ def main():
                 sound_mgr.play("screen_impact")
             if engine.camera_flash > 0.0 and prev_flash == 0.0:
                 sound_mgr.play("flash")
+            if getattr(engine, 'blood_burst', 0.0) > 0.5 and prev_blood <= 0.5:
+                sound_mgr.play("blood_strike")
+                sound_mgr.play("screen_impact")
+            if getattr(engine, 'lightning_flash', 0.0) > 0.5 and prev_lightning <= 0.5:
+                sound_mgr.play("thunder_strike")
+                sound_mgr.play("screen_impact")
             if engine.game_over and not prev_game_over:
                 sound_mgr.play("game_over")
                 sound_mgr.play("screen_impact")
+        else:
+            sound_mgr.stop_weather_ambient()
 
         if current_state == STATE_MENU:
             renderer.update_animation(dt, engine)
@@ -626,9 +705,12 @@ def main():
         elif current_state == STATE_BLESSING_SELECT:
             renderer.update_animation(dt, engine)
             renderer.draw_blessing_selection(selected_blessing, mouse_pos)
+        elif current_state == STATE_MODIFIER_SELECT:
+            renderer.update_animation(dt, engine)
+            renderer.draw_modifier_selection(selected_weather, has_eclipse, current_difficulty, mouse_pos)
         elif current_state == STATE_RITUAL_SUMMARY:
             renderer.update_animation(dt, engine)
-            renderer.draw_ritual_summary(current_persona, selected_artifact, selected_blessing, current_difficulty, mouse_pos)
+            renderer.draw_ritual_summary(current_persona, selected_artifact, selected_blessing, current_difficulty, selected_weather, has_eclipse, mouse_pos)
         elif current_state == STATE_UPGRADES:
             renderer.update_animation(dt, engine)
             renderer.draw_upgrades_screen(mouse_pos)

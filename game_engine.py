@@ -5,6 +5,9 @@ from constants import (
     DIFFICULTY_EASY,
     DIFFICULTY_NORMAL,
     DIFFICULTY_HARD,
+    WEATHER_CALM,
+    WEATHER_THUNDERSTORM,
+    WEATHER_BLOOD_RAIN,
     PILLAR_POSITIONS,
     CENTER_POSITION,
     get_target_victory_turns
@@ -12,7 +15,7 @@ from constants import (
 from models import Pillar, Player, Creature, CandleItem
 
 class GameEngine:
-    def __init__(self, artifact_type="CROSS", persona_id="CARETAKER", difficulty=DIFFICULTY_NORMAL, blessing_type="FIRE"):
+    def __init__(self, artifact_type="CROSS", persona_id="CARETAKER", difficulty=DIFFICULTY_NORMAL, blessing_type="FIRE", weather_type="CALM", has_eclipse=False):
         self.silver_burst = 0.0
         self.camera_flash = 0.0
         self.beam_target = None
@@ -25,9 +28,9 @@ class GameEngine:
         self.will_o_wisps = 0
         self.target_victory_turns = get_target_victory_turns(persona_id, difficulty)
         self.victory_reason = ""
-        self.reset(artifact_type, persona_id, difficulty, blessing_type)
+        self.reset(artifact_type, persona_id, difficulty, blessing_type, weather_type, has_eclipse)
 
-    def reset(self, artifact_type="CROSS", persona_id="CARETAKER", difficulty=DIFFICULTY_NORMAL, blessing_type="FIRE"):
+    def reset(self, artifact_type="CROSS", persona_id="CARETAKER", difficulty=DIFFICULTY_NORMAL, blessing_type="FIRE", weather_type="CALM", has_eclipse=False):
         self.turn = 1
         self.game_over = False
         self.victory = False
@@ -40,6 +43,15 @@ class GameEngine:
         self.beam_target = None
         self.beam_timer = 0.0
         self.difficulty = difficulty
+        self.weather_type = weather_type
+        self.has_eclipse = True if weather_type == "BLOOD_RAIN" else has_eclipse
+        self.eclipse_active = False
+        self.eclipse_frozen_turns_left = 0
+        self.eclipse_triggered = False
+        self.blood_burst = 0.0
+        self.blood_rain_attack_timer = 10
+        self.lightning_flash = 0.0
+        self.lightning_cooldown = random.uniform(4.0, 8.0)
         self.altar_disabled_turns = 0
         self.adrenaline_moves_left = 0
         self.adrenaline_ready = True
@@ -114,6 +126,17 @@ class GameEngine:
                 self.beam_target = None
         if self.purge_burst > 0.0:
             self.purge_burst = max(0.0, self.purge_burst - dt * 1.5)
+        if self.blood_burst > 0.0:
+            self.blood_burst = max(0.0, self.blood_burst - dt * 2.2)
+        if self.lightning_flash > 0.0:
+            self.lightning_flash = max(0.0, self.lightning_flash - dt * 3.5)
+
+        if self.weather_type == "THUNDERSTORM" and not self.game_over:
+            self.lightning_cooldown -= dt
+            if self.lightning_cooldown <= 0.0:
+                self.lightning_flash = 1.0
+                self.screen_shake_trigger = max(self.screen_shake_trigger, 3.5)
+                self.lightning_cooldown = random.uniform(6.0, 12.0)
 
     def check_stationary_recharge(self):
         if self.player.artifact.type == "FLASHLIGHT":
@@ -151,6 +174,73 @@ class GameEngine:
                     target_p.candle.check_overcharge()
                     self.thermal_bond_cooldown = 4
                     self.add_log(f"Vínculo Térmico: {self.get_pillar_label(target_p.id)} absorveu 1t de {self.get_pillar_label(donor_p.id)} (+2t ganhos, recarga 4t)!")
+
+        # Thunderstorm Gale Wind Chill: 12% probability to drain 2 turns from a lit pillar
+        if self.weather_type == "THUNDERSTORM" and consume_turn:
+            if random.random() < 0.12:
+                lit_pillars = [p for p in self.pillars if p.candle.is_lit]
+                if lit_pillars:
+                    target_wind_p = random.choice(lit_pillars)
+                    target_wind_p.candle.turns_left = max(1, target_wind_p.candle.turns_left - 2)
+                    self.screen_shake_trigger = max(self.screen_shake_trigger, 4.5)
+                    self.lightning_flash = 1.0
+                    self.add_log(f"Rajada de Tempestade! Vento gélido drenou 2t da pilastra {self.get_pillar_label(target_wind_p.id)}!")
+
+        # Blood Rain Creature Assault: Creatures attack at least 1 time every 10 turns regardless of lit pillars
+        if self.weather_type == "BLOOD_RAIN" and consume_turn:
+            self.blood_rain_attack_timer -= 1
+            if self.blood_rain_attack_timer <= 0:
+                self.blood_rain_attack_timer = 10
+                self.blood_burst = 1.0
+                self.screen_shake_trigger = max(self.screen_shake_trigger, 8.0)
+                
+                # Check Defenses
+                if self.player.artifact.type == "CROSS" and self.player.artifact.is_charged:
+                    self.player.artifact.is_charged = False
+                    self.silver_burst = 1.0
+                    self.add_log("ATAQUE DA CRIATURA! A Cruz de Prata descarregou sua luz sagrada e repeliu a fera da Chuva de Sangue!")
+                elif self.player.artifact.type == "CAMERA" and getattr(self.player.artifact, 'charges', 0) > 0:
+                    self.player.artifact.use_camera_charge()
+                    self.camera_flash = 1.0
+                    self.add_log(f"ATAQUE DA CRIATURA! O Flash da Câmera ofuscou a besta ({self.player.artifact.charges} restantes)!")
+                else:
+                    if self.player.current_location != "CENTER":
+                        p_id = int(self.player.current_location)
+                        target_p = self.pillars[p_id]
+                    else:
+                        lit_p = [p for p in self.pillars if p.candle.is_lit]
+                        target_p = min(lit_p, key=lambda p: p.candle.turns_left) if lit_p else None
+
+                    if target_p and target_p.candle.is_lit:
+                        target_p.candle.is_lit = False
+                        target_p.candle.turns_left = 0
+                        self.creature.target_proximity = min(1.0, self.creature.target_proximity + 0.35)
+                        self.add_log(f"ATAQUE DE SANGUE! A besta devorou as chamas da pilastra {self.get_pillar_label(target_p.id)}!")
+                    else:
+                        if len(self.player.inventory) > 0:
+                            self.player.pop_candle()
+                            self.creature.target_proximity = min(1.0, self.creature.target_proximity + 0.40)
+                            self.add_log("ATAQUE DE SANGUE! A criatura destruiu 1 vela do seu inventário!")
+                        else:
+                            self.creature.target_proximity = min(1.0, self.creature.target_proximity + 0.50)
+                            self.add_log("ATAQUE DE SANGUE! A fera avançou pelas sombras e arranhou o altar!")
+
+        # Celestial Eclipse Progression
+        if self.has_eclipse and consume_turn:
+            target_apex = 10 if self.target_victory_turns is None else max(6, int(self.target_victory_turns * 0.25))
+            if not self.eclipse_triggered and self.turn >= target_apex:
+                self.eclipse_triggered = True
+                self.eclipse_active = True
+                self.eclipse_frozen_turns_left = random.randint(5, 15)
+                self.screen_shake_trigger = max(self.screen_shake_trigger, 7.0)
+                self.add_log(f"ECLIPSE TOTAL! A Lua foi encoberta e o tempo foi paralisado por {self.eclipse_frozen_turns_left} rodadas!")
+            elif self.eclipse_active:
+                self.eclipse_frozen_turns_left -= 1
+                if self.eclipse_frozen_turns_left <= 0:
+                    self.eclipse_active = False
+                    self.add_log("O Eclipse se dissipou! O ciclo cósmico voltou a avançar.")
+                else:
+                    self.add_log(f"Coroa do Eclipse: Tempo cósmico paralisado ({self.eclipse_frozen_turns_left} rodadas restantes).")
 
         frozen_pillar_id = None
         if self.player.artifact.type == "LANTERN" and self.player.current_location != "CENTER":
@@ -200,14 +290,14 @@ class GameEngine:
                     p.replace_candle(4)
                     revived += 1
                 self.add_log(f"A Cruz de Prata ressuscitou {revived} pilastra(s) com fogo sagrado!")
-                if consume_turn:
+                if consume_turn and not self.eclipse_active:
                     self.turn += 1
             elif self.player.artifact.type == "CAMERA" and self.player.artifact.use_camera_charge():
                 self.camera_flash = 1.0
                 self.screen_shake_trigger = 5.5
                 self.creature.target_proximity = 0.5
                 self.add_log(f"Flash da Câmera disparado ({self.player.artifact.charges} restantes)! Ação permitida nas sombras.")
-                if consume_turn:
+                if consume_turn and not self.eclipse_active:
                     self.turn += 1
             else:
                 self.creature.update_target(ext_count, len(self.pillars), purged, is_stealth)
@@ -222,7 +312,7 @@ class GameEngine:
             if self.player.artifact.type == "CROSS":
                 if self.player.artifact.check_cross_recharge(self.active_candles_count):
                     self.add_log("A Cruz de Prata recuperou sua carga sagrada!")
-            if consume_turn:
+            if consume_turn and not self.eclipse_active:
                 self.turn += 1
 
         if not self.game_over:

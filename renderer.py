@@ -70,6 +70,9 @@ from constants import (
     BLESSING_THERMAL_BOND,
     BLESSING_WILL_O_WISP,
     BLESSING_SECOND_BREATH,
+    WEATHER_CALM,
+    WEATHER_THUNDERSTORM,
+    WEATHER_BLOOD_RAIN,
     PILLAR_POSITIONS,
     CENTER_POSITION,
     get_target_victory_turns
@@ -826,10 +829,150 @@ class Renderer:
         start_btn = pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 105, 320, 44)
         back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 55, 320, 36)
 
-        self.draw_button(start_btn, "RESUMO DO RITUAL", start_btn.collidepoint(mouse_pos), primary=True)
+        self.draw_button(start_btn, "AVANÇAR AOS MODIFICADORES", start_btn.collidepoint(mouse_pos), primary=True)
         self.draw_button(back_btn, "VOLTAR AOS ARTEFATOS", back_btn.collidepoint(mouse_pos))
 
-    def draw_ritual_summary(self, persona_id, artifact_type, blessing_type, difficulty, mouse_pos):
+    def draw_modifier_selection(self, selected_weather, has_eclipse, current_difficulty, mouse_pos):
+        self.screen.fill(COLOR_BG)
+        self.draw_floor()
+
+        title = self.font_large.render("MODIFICADORES DE PARTIDA & CLIMA", True, COLOR_TEXT)
+        self.screen.blit(title, (WINDOW_WIDTH // 2 - title.get_width() // 2, 16))
+
+        sub = self.font_small.render("Configure as condições atmosféricas e astronômicas que regem o santuário durante o ritual.", True, COLOR_TEXT_MUTED)
+        self.screen.blit(sub, (WINDOW_WIDTH // 2 - sub.get_width() // 2, 48))
+
+        # 1. LIVE ANIMATED GOTHIC WINDOW PREVIEW
+        preview_w, preview_h = 360, 110
+        preview_x = WINDOW_WIDTH // 2 - preview_w // 2
+        preview_y = 70
+
+        prev_lbl = self.font_tiny.render("❖ PRÉVIA DO CÉU EM TEMPO REAL ❖", True, COLOR_ACCENT_BLUE)
+        self.screen.blit(prev_lbl, (WINDOW_WIDTH // 2 - prev_lbl.get_width() // 2, preview_y - 15))
+
+        self.draw_gothic_window(
+            engine=None,
+            custom_weather=selected_weather,
+            custom_eclipse=has_eclipse,
+            custom_diff=current_difficulty,
+            win_pos=(preview_x, preview_y, preview_w, preview_h)
+        )
+
+        # 2. CARDS LAYOUT
+        cards_y = 196
+        col_w = 400
+        c1_x = WINDOW_WIDTH // 2 - col_w - 15
+        c2_x = WINDOW_WIDTH // 2 + 15
+
+        # --- SEÇÃO 1: CLIMA ---
+        w_title = self.font_mid.render("1. Condição Climática", True, COLOR_TEXT)
+        self.screen.blit(w_title, (c1_x, cards_y))
+
+        card_h = 75
+        card_gap = 8
+        # Card 1A: Céu Sereno
+        rect_calm = pygame.Rect(c1_x, cards_y + 24, col_w, card_h)
+        is_calm_sel = (selected_weather == "CALM")
+        self.draw_weather_card(rect_calm, "CÉU SERENO", "NOITE CLÁSSICA", "Fluxo tradicional e brisa serena. Sem penalidades climáticas nas chamas.", COLOR_ACCENT_BLUE, is_calm_sel, rect_calm.collidepoint(mouse_pos))
+
+        # Card 1B: Tempestade de Trovões
+        rect_storm = pygame.Rect(c1_x, cards_y + 24 + card_h + card_gap, col_w, card_h)
+        is_storm_sel = (selected_weather == "THUNDERSTORM")
+        self.draw_weather_card(rect_storm, "TEMPESTADE DE TROVÕES", "VENTOS GÉLIDOS", "Ventos e relâmpagos. 12% de chance/turno de drenar 2t de uma pilastra acesa.", COLOR_ACCENT_PURPLE, is_storm_sel, rect_storm.collidepoint(mouse_pos))
+
+        # Card 1C: Chuva de Sangue
+        rect_blood = pygame.Rect(c1_x, cards_y + 24 + (card_h + card_gap) * 2, col_w, card_h)
+        is_blood_sel = (selected_weather == "BLOOD_RAIN")
+        self.draw_weather_card(rect_blood, "CHUVA DE SANGUE", "REQUER ECLIPSE", "Chuva escarlate! Criaturas atacam o jogador a cada 10 turnos independente das chamas.", COLOR_ACCENT_RED, is_blood_sel, rect_blood.collidepoint(mouse_pos))
+
+        # --- SEÇÃO 2: EVENTO CELESTIAL (ECLIPSE) ---
+        e_title = self.font_mid.render("2. Evento Cósmico", True, COLOR_TEXT)
+        self.screen.blit(e_title, (c2_x, cards_y))
+
+        rect_eclipse = pygame.Rect(c2_x, cards_y + 24, col_w, card_h * 3 + card_gap * 2)
+        self.draw_eclipse_card(rect_eclipse, has_eclipse, current_difficulty, selected_weather, rect_eclipse.collidepoint(mouse_pos))
+
+        # Action Buttons
+        fwd_btn = pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 105, 320, 44)
+        back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 160, WINDOW_HEIGHT - 55, 320, 36)
+
+        self.draw_button(fwd_btn, "AVANÇAR AO RESUMO DO RITUAL", fwd_btn.collidepoint(mouse_pos), primary=True)
+        self.draw_button(back_btn, "VOLTAR A BÊNÇÃOS", back_btn.collidepoint(mouse_pos))
+
+    def draw_weather_card(self, rect, title_txt, tag_txt, desc_txt, accent_col, is_sel, is_hov):
+        t = self.time_elapsed
+        surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        bg_col = (30, 45, 70, 240) if is_sel else (COLOR_UI_PANEL_HOVER if is_hov else COLOR_UI_PANEL)
+        border_col = accent_col if is_sel else (COLOR_UI_BORDER if not is_hov else (90, 115, 150))
+        border_thick = 3 if is_sel else (2 if is_hov else 1)
+
+        pygame.draw.rect(surf, bg_col, (0, 0, rect.width, rect.height), border_radius=8)
+        pygame.draw.rect(surf, border_col, (0, 0, rect.width, rect.height), border_thick, border_radius=8)
+        self.screen.blit(surf, (rect.x, rect.y))
+
+        t_s = self.font_small.render(f"❖ {title_txt}", True, (255, 255, 255) if is_sel else COLOR_TEXT)
+        tag_s = self.font_tiny.render(f"[{tag_txt}]", True, accent_col)
+        self.screen.blit(t_s, (rect.x + 12, rect.y + 8))
+        self.screen.blit(tag_s, (rect.right - tag_s.get_width() - 12, rect.y + 10))
+
+        self.draw_wrapped_text(desc_txt, self.font_tiny, COLOR_TEXT_MUTED, rect.x + 12, rect.y + 30, max_width=rect.width - 24, line_spacing=2)
+
+    def draw_eclipse_card(self, rect, is_active, diff, weather, is_hov):
+        t = self.time_elapsed
+        if diff == DIFFICULTY_EASY:
+            halo_col = (34, 197, 94)
+            diff_label = "Coroa Esmeralda (Suave)"
+        elif diff == DIFFICULTY_NORMAL:
+            halo_col = (59, 130, 246)
+            diff_label = "Coroa Safira (Padrão)"
+        elif diff == DIFFICULTY_HARD:
+            halo_col = (239, 68, 68)
+            diff_label = "Coroa Sangue (Horror)"
+        else:
+            halo_col = (168, 85, 247)
+            diff_label = "Coroa Violeta (Sem Fim)"
+
+        surf = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        bg_col = (35, 30, 50, 240) if is_active else (COLOR_UI_PANEL_HOVER if is_hov else COLOR_UI_PANEL)
+        border_col = halo_col if is_active else (COLOR_UI_BORDER if not is_hov else (90, 115, 150))
+        border_thick = 3 if is_active else (2 if is_hov else 1)
+
+        pygame.draw.rect(surf, bg_col, (0, 0, rect.width, rect.height), border_radius=8)
+        pygame.draw.rect(surf, border_col, (0, 0, rect.width, rect.height), border_thick, border_radius=8)
+        self.screen.blit(surf, (rect.x, rect.y))
+
+        st_label = "ATIVADO" if is_active else "DESATIVADO"
+        st_col = COLOR_ACCENT_GREEN if is_active else COLOR_TEXT_MUTED
+
+        t_s = self.font_small.render(f"🌑 ECLIPSE CELESTIAL", True, (255, 255, 255))
+        st_s = self.font_small.render(f"[{st_label}]", True, st_col)
+        self.screen.blit(t_s, (rect.x + 14, rect.y + 12))
+        self.screen.blit(st_s, (rect.right - st_s.get_width() - 14, rect.y + 12))
+
+        tag_s = self.font_tiny.render(f"Padrão de Cor: {diff_label}", True, halo_col)
+        self.screen.blit(tag_s, (rect.x + 14, rect.y + 36))
+
+        if weather == "BLOOD_RAIN":
+            req_box = pygame.Rect(rect.x + 12, rect.y + 54, rect.width - 24, 20)
+            pygame.draw.rect(self.screen, (55, 14, 22), req_box, border_radius=4)
+            pygame.draw.rect(self.screen, (220, 38, 38), req_box, 1, border_radius=4)
+            req_s = self.font_tiny.render("✦ OBRIGATÓRIO NA CHUVA DE SANGUE ✦", True, (254, 202, 202))
+            self.screen.blit(req_s, (req_box.x + (req_box.width - req_s.get_width()) // 2, req_box.y + 3))
+            start_desc_y = rect.y + 80
+        else:
+            start_desc_y = rect.y + 58
+
+        desc = [
+            "• Um astro negro viaja em direção à Lua no início do ritual.",
+            "• Ao cobrir a Lua, o tempo e o ritual congelam por 5 a 15 rodadas.",
+            "• Durante o eclipse total, a Lua emite uma coroa da cor do modo.",
+            "• Clique para Alternar (Ativar/Desativar)." if weather != "BLOOD_RAIN" else "• Status: Travado em Ativado pela Chuva de Sangue."
+        ]
+        dy = start_desc_y
+        for d_line in desc:
+            dy = self.draw_wrapped_text(d_line, self.font_tiny, COLOR_TEXT if is_active else COLOR_TEXT_MUTED, rect.x + 14, dy, max_width=rect.width - 28, line_spacing=2) + 4
+
+    def draw_ritual_summary(self, persona_id, artifact_type, blessing_type, difficulty, selected_weather, has_eclipse, mouse_pos):
         self.screen.fill(COLOR_BG)
         self.draw_floor()
 
@@ -919,14 +1062,14 @@ class Renderer:
         for b_rule in b_rules:
             by = self.draw_wrapped_text(b_rule, self.font_tiny, COLOR_TEXT, bless_box.x + 10, by, max_width=bless_box.width - 20, line_spacing=2) + 4
 
-        # --- COLUNA 3: CONDIÇÕES DE VITÓRIA ---
+        # --- COLUNA 3: CONDIÇÕES DE VITÓRIA & MODIFICADORES ---
         c3_x = c2_x + col_w + col_gap
         c3_box = pygame.Rect(c3_x, col_y, col_w, 455)
         pygame.draw.rect(self.screen, (20, 28, 42), c3_box, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_UI_BORDER, c3_box, 1, border_radius=8)
 
-        t3 = self.font_mid.render("3. VITÓRIA & DESAFIO", True, COLOR_TEXT)
-        b3 = self.font_tiny.render("[OBJETIVO]", True, COLOR_ENCHANT_GOLD)
+        t3 = self.font_mid.render("3. VITÓRIA & AMBIENTE", True, COLOR_TEXT)
+        b3 = self.font_tiny.render("[DESAFIO]", True, COLOR_ENCHANT_GOLD)
         self.screen.blit(t3, (c3_x + 14, col_y + 12))
         self.screen.blit(b3, (c3_x + c3_box.width - b3.get_width() - 14, col_y + 15))
         pygame.draw.line(self.screen, COLOR_UI_BORDER, (c3_x + 14, col_y + 38), (c3_x + c3_box.width - 14, col_y + 38), 1)
@@ -939,57 +1082,79 @@ class Renderer:
         }
         d_title, d_col, d_mod = diff_names.get(difficulty, ("PADRÃO", COLOR_ACCENT_BLUE, "Padrão"))
 
-        diff_box = pygame.Rect(c3_x + 12, col_y + 48, col_w - 24, 60)
+        diff_box = pygame.Rect(c3_x + 12, col_y + 46, col_w - 24, 52)
         pygame.draw.rect(self.screen, (15, 22, 35), diff_box, border_radius=6)
         pygame.draw.rect(self.screen, d_col, diff_box, 1, border_radius=6)
 
-        df_lbl = self.font_tiny.render("DIFICULDADE SELECIONADA:", True, COLOR_TEXT_MUTED)
+        df_lbl = self.font_tiny.render("DIFICULDADE:", True, COLOR_TEXT_MUTED)
         df_val = self.font_small.render(d_title, True, d_col)
-        df_mod_s = self.font_tiny.render(f"• {d_mod}", True, COLOR_TEXT_MUTED)
         self.screen.blit(df_lbl, (diff_box.x + 10, diff_box.y + 6))
-        self.screen.blit(df_val, (diff_box.x + 10, diff_box.y + 22))
-        self.screen.blit(df_mod_s, (diff_box.x + 10, diff_box.y + 40))
+        self.screen.blit(df_val, (diff_box.x + 10, diff_box.y + 24))
+
+        # Modifiers Box
+        mod_box = pygame.Rect(c3_x + 12, col_y + 104, col_w - 24, 58)
+        pygame.draw.rect(self.screen, (15, 22, 35), mod_box, border_radius=6)
+        
+        if selected_weather == "BLOOD_RAIN":
+            m_w_txt = "Chuva de Sangue (Ataques 10t)"
+            m_w_col = COLOR_ACCENT_RED
+        elif selected_weather == "THUNDERSTORM":
+            m_w_txt = "Tempestade de Trovões (12% Vento)"
+            m_w_col = COLOR_ACCENT_PURPLE
+        else:
+            m_w_txt = "Céu Sereno (Clássico)"
+            m_w_col = COLOR_ACCENT_BLUE
+
+        pygame.draw.rect(self.screen, m_w_col if has_eclipse else COLOR_ACCENT_BLUE, mod_box, 1, border_radius=6)
+
+        m_e_txt = "Eclipse Ativado (Congela 5-15t)" if has_eclipse else "Sem Eclipse"
+        m_lbl = self.font_tiny.render("MODIFICADORES CLIMÁTICOS:", True, COLOR_TEXT_MUTED)
+        m_val = self.font_tiny.render(f"• Clima: {m_w_txt}", True, m_w_col)
+        m_e_val = self.font_tiny.render(f"• Celestial: {m_e_txt}", True, COLOR_ACCENT_PURPLE if has_eclipse else COLOR_TEXT_MUTED)
+        self.screen.blit(m_lbl, (mod_box.x + 10, mod_box.y + 5))
+        self.screen.blit(m_val, (mod_box.x + 10, mod_box.y + 21))
+        self.screen.blit(m_e_val, (mod_box.x + 10, mod_box.y + 37))
 
         target_turns = get_target_victory_turns(persona_id, difficulty)
-        goal_box = pygame.Rect(c3_x + 12, col_y + 118, col_w - 24, 115)
+        goal_box = pygame.Rect(c3_x + 12, col_y + 168, col_w - 24, 105)
         pygame.draw.rect(self.screen, (32, 28, 18), goal_box, border_radius=6)
         pygame.draw.rect(self.screen, COLOR_ENCHANT_GOLD if target_turns is not None else COLOR_ACCENT_PURPLE, goal_box, 2, border_radius=6)
 
         if target_turns is not None:
             g_title = self.font_tiny.render("✦ META PRINCIPAL DE VITÓRIA:", True, COLOR_ENCHANT_GOLD)
             g_val = self.font_large.render(f"{target_turns} RODADAS", True, (255, 255, 255))
-            self.screen.blit(g_title, (goal_box.x + 10, goal_box.y + 8))
-            self.screen.blit(g_val, (goal_box.x + 10, goal_box.y + 26))
+            self.screen.blit(g_title, (goal_box.x + 10, goal_box.y + 6))
+            self.screen.blit(g_val, (goal_box.x + 10, goal_box.y + 22))
 
             g_desc = f"Mantenha as chamas do salão acesas por {target_turns} turnos até a aurora nascer para selar a escuridão e vencer."
-            self.draw_wrapped_text(g_desc, self.font_tiny, (254, 240, 138), goal_box.x + 10, goal_box.y + 62, max_width=goal_box.width - 20, line_spacing=2)
+            self.draw_wrapped_text(g_desc, self.font_tiny, (254, 240, 138), goal_box.x + 10, goal_box.y + 56, max_width=goal_box.width - 20, line_spacing=2)
         else:
             g_title = self.font_tiny.render("✦ MODO DE SOBREVIVÊNCIA PURA:", True, COLOR_ACCENT_PURPLE)
             g_val = self.font_large.render("NOITE SEM FIM", True, (255, 255, 255))
-            self.screen.blit(g_title, (goal_box.x + 10, goal_box.y + 8))
-            self.screen.blit(g_val, (goal_box.x + 10, goal_box.y + 26))
+            self.screen.blit(g_title, (goal_box.x + 10, goal_box.y + 6))
+            self.screen.blit(g_val, (goal_box.x + 10, goal_box.y + 22))
 
             g_desc = "Não há limite de turnos e a aurora nunca chegará. Sobreviva o máximo de rodadas possível contra as criaturas da penumbra."
-            self.draw_wrapped_text(g_desc, self.font_tiny, (216, 180, 254), goal_box.x + 10, goal_box.y + 62, max_width=goal_box.width - 20, line_spacing=2)
+            self.draw_wrapped_text(g_desc, self.font_tiny, (216, 180, 254), goal_box.x + 10, goal_box.y + 56, max_width=goal_box.width - 20, line_spacing=2)
 
-        gy = col_y + 245
+        gy = col_y + 280
         if persona_id == PERSONA_PALADIN:
-            alt_box = pygame.Rect(c3_x + 12, gy, col_w - 24, 90)
+            alt_box = pygame.Rect(c3_x + 12, gy, col_w - 24, 75)
             pygame.draw.rect(self.screen, (25, 30, 20), alt_box, border_radius=6)
             pygame.draw.rect(self.screen, COLOR_PALADIN_GOLD, alt_box, 1, border_radius=6)
             a_lbl = self.font_tiny.render("✦ VITÓRIA SAGRADA ALTERNATIVA:", True, COLOR_PALADIN_GOLD)
-            self.screen.blit(a_lbl, (alt_box.x + 10, alt_box.y + 6))
-            a_desc = "Expurgue todas as 5 criaturas com o Julgamento Sagrado [Q] para banir as trevas e vencer instantaneamente a qualquer momento!"
-            self.draw_wrapped_text(a_desc, self.font_tiny, COLOR_TEXT, alt_box.x + 10, alt_box.y + 24, max_width=alt_box.width - 20, line_spacing=2)
-            gy += 100
+            self.screen.blit(a_lbl, (alt_box.x + 10, alt_box.y + 5))
+            a_desc = "Expurgue todas as 5 criaturas com o Julgamento Sagrado [Q] para vencer instantaneamente!"
+            self.draw_wrapped_text(a_desc, self.font_tiny, COLOR_TEXT, alt_box.x + 10, alt_box.y + 22, max_width=alt_box.width - 20, line_spacing=2)
+            gy += 82
 
         defeat_box = pygame.Rect(c3_x + 12, gy, col_w - 24, col_y + 445 - gy)
         pygame.draw.rect(self.screen, (20, 15, 20), defeat_box, border_radius=6)
         pygame.draw.rect(self.screen, COLOR_UI_BORDER, defeat_box, 1, border_radius=6)
         def_lbl = self.font_tiny.render("✦ CONDIÇÃO DE DERROTA:", True, COLOR_ACCENT_RED)
-        self.screen.blit(def_lbl, (defeat_box.x + 10, defeat_box.y + 6))
-        def_desc = "Se as 6 velas apagarem ao mesmo tempo (sem Cruz ativa ou Flash da Câmera), o salão cairá no colapso e o ritual será perdido."
-        self.draw_wrapped_text(def_desc, self.font_tiny, COLOR_TEXT_MUTED, defeat_box.x + 10, defeat_box.y + 24, max_width=defeat_box.width - 20, line_spacing=2)
+        self.screen.blit(def_lbl, (defeat_box.x + 10, defeat_box.y + 5))
+        def_desc = "Se as 6 velas apagarem ao mesmo tempo (sem Cruz ativa ou Flash), a escuridão consumirá o santuário."
+        self.draw_wrapped_text(def_desc, self.font_tiny, COLOR_TEXT_MUTED, defeat_box.x + 10, defeat_box.y + 22, max_width=defeat_box.width - 20, line_spacing=2)
 
         back_btn = pygame.Rect(WINDOW_WIDTH // 2 - 310, WINDOW_HEIGHT - 68, 290, 44)
         start_btn = pygame.Rect(WINDOW_WIDTH // 2 + 20, WINDOW_HEIGHT - 68, 290, 44)
@@ -1695,6 +1860,7 @@ class Renderer:
         self.draw_silver_burst(engine)
         self.draw_camera_flash(engine)
         self.draw_purge_burst(engine)
+        self.draw_blood_burst(engine)
 
         self.screen = orig_screen
         self.screen.fill(COLOR_BG)
@@ -1705,31 +1871,60 @@ class Renderer:
         if engine.game_over:
             self.draw_game_over(engine, mouse_pos)
 
-    def draw_gothic_window(self, engine):
-        win_w, win_h = 400, 130
-        win_x = WINDOW_WIDTH // 2 - win_w // 2
-        win_y = 86
+    def draw_gothic_window(self, engine=None, custom_weather=None, custom_eclipse=None, custom_diff=None, win_pos=None):
+        win_w, win_h = (400, 130) if win_pos is None else (win_pos[2], win_pos[3])
+        win_x = (WINDOW_WIDTH // 2 - win_w // 2) if win_pos is None else win_pos[0]
+        win_y = 86 if win_pos is None else win_pos[1]
         cx = win_w // 2
         t = self.time_elapsed
 
-        ext_count = engine.extinguished_count
-        light_ratio = max(0.10, 1.0 - (ext_count / 6.0) * 0.85)
-        if engine.player.persona.light_prayer_turns > 0:
-            light_ratio = min(1.0, light_ratio + 0.35)
+        if engine is not None:
+            ext_count = engine.extinguished_count
+            light_ratio = max(0.10, 1.0 - (ext_count / 6.0) * 0.85)
+            if engine.player.persona.light_prayer_turns > 0:
+                light_ratio = min(1.0, light_ratio + 0.35)
+            is_victory = engine.victory
+            if engine.target_victory_turns is not None:
+                prog = min(1.0, max(0.0, engine.turn / float(engine.target_victory_turns)))
+            else:
+                prog = ((t * 0.04 + engine.turn * 0.03) % 1.0)
+            diff = engine.difficulty
+            weather = getattr(engine, 'weather_type', "CALM")
+            has_eclipse = getattr(engine, 'has_eclipse', False)
+            is_eclipsed = getattr(engine, 'eclipse_active', False)
+            lightning_flash = getattr(engine, 'lightning_flash', 0.0)
+            apex_turn = getattr(engine, 'eclipse_apex_turn', 10)
+            turn_num = engine.turn
+            eclipse_triggered = getattr(engine, 'eclipse_triggered', False)
+        else:
+            ext_count = 0
+            light_ratio = 1.0
+            is_victory = False
+            prog = (t * 0.03) % 1.0
+            diff = custom_diff or DIFFICULTY_NORMAL
+            weather = custom_weather or WEATHER_CALM
+            has_eclipse = custom_eclipse if custom_eclipse is not None else False
+            is_eclipsed = (math.sin(t * 1.5) > 0.1) if has_eclipse else False
+            lightning_flash = (1.0 if (t % 3.5 < 0.22 and weather == "THUNDERSTORM") else 0.0)
+            apex_turn = 10
+            turn_num = int(t * 2.0)
+            eclipse_triggered = is_eclipsed
 
         sky_surf = pygame.Surface((win_w, win_h), pygame.SRCALPHA)
-
-        is_victory = engine.victory
-        if engine.target_victory_turns is not None:
-            prog = min(1.0, max(0.0, engine.turn / float(engine.target_victory_turns)))
-        else:
-            prog = ((t * 0.04 + engine.turn * 0.03) % 1.0)
 
         if is_victory:
             top_sky = (255, 175, 75)
             mid_sky = (255, 215, 130)
             bot_sky = (250, 160, 135)
-        elif prog >= 0.75 and engine.target_victory_turns is not None:
+        elif weather == "BLOOD_RAIN":
+            top_sky = (18, 4, 8)
+            mid_sky = (36, 6, 12)
+            bot_sky = (56, 12, 18)
+        elif weather == "THUNDERSTORM":
+            top_sky = (4, 6, 14)
+            mid_sky = (9, 13, 24)
+            bot_sky = (15, 20, 36)
+        elif prog >= 0.75 and engine is not None and engine.target_victory_turns is not None:
             tw_f = (prog - 0.75) / 0.25
             top_sky = (int(12 + tw_f * 40), int(16 + tw_f * 35), int(35 + tw_f * 50))
             mid_sky = (int(20 + tw_f * 70), int(26 + tw_f * 60), int(55 + tw_f * 70))
@@ -1753,8 +1948,8 @@ class Renderer:
                 b = int(mid_sky[2] * (1.0 - r_half) + bot_sky[2] * r_half)
             pygame.draw.line(sky_surf, (r, g, b), (0, y_step), (win_w, y_step))
 
-        if not is_victory and prog < 0.85:
-            star_fade = (1.0 - (prog - 0.5) / 0.35 if prog > 0.5 and engine.target_victory_turns is not None else 1.0) * light_ratio
+        if not is_victory and prog < 0.85 and weather not in ("THUNDERSTORM", "BLOOD_RAIN"):
+            star_fade = (1.0 - (prog - 0.5) / 0.35 if prog > 0.5 and engine is not None and engine.target_victory_turns is not None else 1.0) * light_ratio
             for idx, (sx, sy, seed) in enumerate([
                 (45, 35, 1.2), (85, 50, 2.5), (125, 25, 4.1), (165, 58, 0.8),
                 (240, 28, 3.3), (280, 52, 5.0), (325, 24, 1.9), (365, 45, 2.8),
@@ -1766,10 +1961,31 @@ class Renderer:
                 if s_alpha > 10:
                     pygame.draw.circle(sky_surf, (230, 240, 255, s_alpha), (sx, sy), 1)
 
+        # Determine Halo Color based on difficulty (Requirement 2°)
+        if diff == DIFFICULTY_EASY:
+            halo_col = (34, 197, 94)      # Emerald Green
+            m_core = (125, 211, 252)
+            m_glow = (56, 189, 248, int(60 * light_ratio))
+            is_crescent = True
+        elif diff == DIFFICULTY_NORMAL:
+            halo_col = (59, 130, 246)     # Sapphire Blue
+            m_core = (226, 232, 240)
+            m_glow = (200, 220, 255, int(55 * light_ratio))
+            is_crescent = False
+        elif diff == DIFFICULTY_HARD:
+            halo_col = (239, 68, 68)      # Blood Crimson
+            m_core = (239, 68, 68)
+            m_glow = (255, 20, 45, int(70 * light_ratio))
+            is_crescent = False
+        else:
+            halo_col = (168, 85, 247)     # Mystic Purple
+            m_core = (192, 132, 252)
+            m_glow = (168, 85, 247, int(65 * light_ratio))
+            is_crescent = True
+
         if is_victory:
             sun_x = cx
             sun_y = 58
-            
             for ray_i in range(12):
                 ray_ang = ray_i * (math.pi / 6) + t * 0.8
                 ray_len = 42 + 12 * math.sin(t * 4.0 + ray_i)
@@ -1786,23 +2002,6 @@ class Renderer:
             arc_rise = math.sin(prog * math.pi) * 44
             moon_y = int(92 - arc_rise + math.cos(t * 0.5) * 4)
 
-            if engine.difficulty == DIFFICULTY_EASY:
-                m_core = (125, 211, 252)
-                m_glow = (56, 189, 248, int(60 * light_ratio))
-                is_crescent = True
-            elif engine.difficulty == DIFFICULTY_NORMAL:
-                m_core = (226, 232, 240)
-                m_glow = (200, 220, 255, int(55 * light_ratio))
-                is_crescent = False
-            elif engine.difficulty == DIFFICULTY_HARD:
-                m_core = (239, 68, 68)
-                m_glow = (255, 20, 45, int(70 * light_ratio))
-                is_crescent = False
-            else:
-                m_core = (192, 132, 252)
-                m_glow = (168, 85, 247, int(65 * light_ratio))
-                is_crescent = True
-
             pygame.draw.circle(sky_surf, m_glow, (moon_x, moon_y), 28)
             pygame.draw.circle(sky_surf, (*m_core[:3], int(110 * light_ratio)), (moon_x, moon_y), 18)
             pygame.draw.circle(sky_surf, m_core, (moon_x, moon_y), 13)
@@ -1814,13 +2013,64 @@ class Renderer:
                 pygame.draw.circle(sky_surf, (int(m_core[0]*0.72), int(m_core[1]*0.72), int(m_core[2]*0.72)), (moon_x - 4, moon_y - 2), 3)
                 pygame.draw.circle(sky_surf, (int(m_core[0]*0.72), int(m_core[1]*0.72), int(m_core[2]*0.72)), (moon_x + 4, moon_y + 3), 2)
 
-        cloud_col_back = (255, 220, 180, 140) if is_victory else (20, 30, 50, int(110 * light_ratio))
-        cloud_col_mid = (255, 240, 205, 170) if is_victory else (30, 42, 68, int(140 * light_ratio))
-        cloud_col_fore = (255, 250, 230, 200) if is_victory else (45, 60, 92, int(120 * light_ratio))
+            # Draw Celestial Eclipse Orb & Radiant Corona
+            if has_eclipse:
+                if engine is not None:
+                    if is_eclipsed:
+                        orb_x, orb_y = moon_x, moon_y
+                        coverage = 1.0
+                    elif not eclipse_triggered:
+                        e_prog = min(1.0, max(0.0, turn_num / float(apex_turn)))
+                        orb_x = int(moon_x - (1.0 - e_prog) * 90)
+                        orb_y = int(moon_y - (1.0 - e_prog) * 25)
+                        coverage = e_prog
+                    else:
+                        orb_x = int(moon_x + 90)
+                        orb_y = int(moon_y + 25)
+                        coverage = 0.0
+                else:
+                    e_cycle = 0.5 + 0.5 * math.sin(t * 1.5)
+                    orb_x = int(moon_x - (1.0 - e_cycle) * 55)
+                    orb_y = int(moon_y - (1.0 - e_cycle) * 14)
+                    coverage = e_cycle
+
+                # Radiant Pulsating Corona Flare (when covered)
+                if coverage >= 0.82 or is_eclipsed:
+                    c_alpha = int(180 + 75 * math.sin(t * 6.0))
+                    for ray_i in range(16):
+                        r_ang = ray_i * (math.pi / 8.0) + t * 1.6
+                        r_len = 22 + 8 * math.sin(t * 5.0 + ray_i * 1.2)
+                        rx = moon_x + math.cos(r_ang) * r_len
+                        ry = moon_y + math.sin(r_ang) * (r_len * 0.7)
+                        pygame.draw.line(sky_surf, (*halo_col, c_alpha), (moon_x, moon_y), (int(rx), int(ry)), 2)
+                    pygame.draw.circle(sky_surf, (*halo_col, int(c_alpha * 0.7)), (moon_x, moon_y), 24, 3)
+
+                # Dark Ominous Celestial Disk
+                pygame.draw.circle(sky_surf, (2, 4, 10), (orb_x, orb_y), 14)
+                pygame.draw.circle(sky_surf, (*halo_col, int(180 * coverage)), (orb_x, orb_y), 14, 1)
+
+        # Clouds Simulation
+        cloud_speed = 36.0 if weather in ("THUNDERSTORM", "BLOOD_RAIN") else 14.0
+        if is_victory:
+            cloud_col_back = (255, 220, 180, 140)
+            cloud_col_mid = (255, 240, 205, 170)
+            cloud_col_fore = (255, 250, 230, 200)
+        elif weather == "BLOOD_RAIN":
+            cloud_col_back = (35, 8, 14, 170)
+            cloud_col_mid = (48, 12, 20, 190)
+            cloud_col_fore = (65, 16, 28, 180)
+        elif weather == "THUNDERSTORM":
+            cloud_col_back = (15, 20, 35, 160)
+            cloud_col_mid = (22, 28, 48, 190)
+            cloud_col_fore = (32, 40, 65, 180)
+        else:
+            cloud_col_back = (20, 30, 50, int(110 * light_ratio))
+            cloud_col_mid = (30, 42, 68, int(140 * light_ratio))
+            cloud_col_fore = (45, 60, 92, int(120 * light_ratio))
 
         for c_i in range(4):
             c_offset = c_i * 130
-            c_x = int((t * 14.0 + c_offset) % (win_w + 180)) - 90
+            c_x = int((t * cloud_speed + c_offset) % (win_w + 180)) - 90
             c_y = 40 + int(math.sin(t * 0.5 + c_i) * 5)
             pygame.draw.circle(sky_surf, cloud_col_back, (c_x, c_y), 32)
             pygame.draw.circle(sky_surf, cloud_col_back, (c_x + 25, c_y + 4), 25)
@@ -1828,7 +2078,7 @@ class Renderer:
 
         for c_i in range(3):
             c_offset = c_i * 160 + 60
-            c_x = int((t * 24.0 + c_offset) % (win_w + 200)) - 100
+            c_x = int((t * (cloud_speed * 1.5) + c_offset) % (win_w + 200)) - 100
             c_y = 65 + int(math.cos(t * 0.7 + c_i) * 6)
             pygame.draw.circle(sky_surf, cloud_col_mid, (c_x, c_y), 36)
             pygame.draw.circle(sky_surf, cloud_col_mid, (c_x + 28, c_y + 5), 28)
@@ -1836,12 +2086,41 @@ class Renderer:
 
         for c_i in range(3):
             c_offset = c_i * 150 + 30
-            c_x = int((t * 36.0 + c_offset) % (win_w + 180)) - 90
+            c_x = int((t * (cloud_speed * 2.2) + c_offset) % (win_w + 180)) - 90
             c_y = 88 + int(math.sin(t * 1.1 + c_i) * 4)
             pygame.draw.circle(sky_surf, cloud_col_fore, (c_x, c_y), 26)
             pygame.draw.circle(sky_surf, cloud_col_fore, (c_x + 22, c_y + 3), 20)
 
-        if not is_victory and light_ratio < 0.9:
+        # Rain Streaks & Lightning Flashes
+        if weather == "BLOOD_RAIN":
+            for r_i in range(50):
+                rx = int((t * 240.0 + r_i * 39) % (win_w + 120)) - 60
+                ry = int((t * 420.0 + r_i * 29) % (win_h + 40)) - 20
+                pygame.draw.line(sky_surf, (225, 30, 45, 190), (rx, ry), (rx + 6, ry + 15), 1)
+
+            blood_overlay = pygame.Surface((win_w, win_h), pygame.SRCALPHA)
+            blood_overlay.fill((160, 20, 35, 35))
+            sky_surf.blit(blood_overlay, (0, 0))
+
+        elif weather == "THUNDERSTORM":
+            for r_i in range(45):
+                rx = int((t * 220.0 + r_i * 41) % (win_w + 120)) - 60
+                ry = int((t * 400.0 + r_i * 31) % (win_h + 40)) - 20
+                pygame.draw.line(sky_surf, (160, 200, 255, 140), (rx, ry), (rx + 6, ry + 14), 1)
+
+            if lightning_flash > 0.05:
+                flash_alpha = int(min(1.0, lightning_flash) * 210)
+                l_surf = pygame.Surface((win_w, win_h), pygame.SRCALPHA)
+                l_surf.fill((215, 235, 255, flash_alpha))
+                sky_surf.blit(l_surf, (0, 0))
+
+                bolt_x = int(win_w * 0.45 + math.sin(t * 12.0) * 60)
+                pygame.draw.line(sky_surf, (255, 255, 255, 255), (bolt_x, 10), (bolt_x - 14, 45), 2)
+                pygame.draw.line(sky_surf, (255, 255, 255, 255), (bolt_x - 14, 45), (bolt_x + 8, 75), 2)
+                pygame.draw.line(sky_surf, (255, 255, 255, 255), (bolt_x + 8, 75), (bolt_x - 10, win_h - 10), 2)
+                pygame.draw.line(sky_surf, (190, 220, 255, 220), (bolt_x - 14, 45), (bolt_x - 26, 70), 1)
+
+        if not is_victory and light_ratio < 0.9 and weather not in ("THUNDERSTORM", "BLOOD_RAIN"):
             shadow_mask = pygame.Surface((win_w, win_h), pygame.SRCALPHA)
             shadow_alpha = int((1.0 - light_ratio) * 160)
             shadow_mask.fill((3, 5, 10, shadow_alpha))
@@ -1953,6 +2232,12 @@ class Renderer:
                 ]
                 pygame.draw.polygon(beam_surf, moon_col, poly)
 
+        if getattr(engine, 'lightning_flash', 0.0) > 0.05 and getattr(engine, 'weather_type', '') == "THUNDERSTORM":
+            l_alpha = int(min(1.0, engine.lightning_flash) * 110)
+            l_flash_surf = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+            l_flash_surf.fill((210, 230, 255, l_alpha))
+            beam_surf.blit(l_flash_surf, (0, 0))
+
         self.screen.blit(beam_surf, (0, 0))
 
     def draw_beam_effect(self, engine):
@@ -2010,6 +2295,16 @@ class Renderer:
             pygame.draw.line(burst_surf, (254, 240, 138, burst_alpha), (cx, cy), (int(rx), int(ry)), 3)
 
         self.screen.blit(burst_surf, (0, 0))
+
+    def draw_blood_burst(self, engine):
+        if not hasattr(engine, 'blood_burst') or engine.blood_burst <= 0.0:
+            return
+
+        b_alpha = int(min(1.0, engine.blood_burst) * 195)
+        b_surf = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        b_surf.fill((160, 10, 25, b_alpha))
+        pygame.draw.rect(b_surf, (230, 20, 35, int(b_alpha * 0.85)), (0, 0, WINDOW_WIDTH, WINDOW_HEIGHT), 18)
+        self.screen.blit(b_surf, (0, 0))
 
     def draw_floor(self):
         tile_size = 50
