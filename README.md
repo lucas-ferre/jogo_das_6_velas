@@ -1,113 +1,182 @@
-# O Ritual das 6 Velas
+# O Ritual das 6 Velas — Arquitetura Técnica & Documentação de Engenharia
 
-Jogo de sobrevivência e gerenciamento em Python (Pygame) com atmosfera gótica sombria, sintetizador procedural de áudio 8-bits, sistema dinâmico de turnos, iluminação 2D, seletor de dificuldade com ambientação dinâmica (fases da Lua), sistema com 5 Arquétipos de Persona, 5 Artefatos Sagrados e 5 Bênçãos Divinas Pré-Ritual.
+Um motor de jogo tático de sobrevivência em turnos com iluminação 2D dinâmica, sintetizador de áudio procedural puramente matemático, máquina de estados desacoplada e renderização gráfica em camadas com Pygame.
 
-## Fluxo de Preparação do Ritual
-
-Ao iniciar o jogo pelo Menu Principal, o jogador personaliza sua experiência em 3 etapas consecutivas:
-1. **Escolha de Arquétipo de Persona (1 a 5)**
-2. **Escolha de Artefato Sagrado & Tecnológico (1 a 5)**
-3. **Escolha de Bênção Divina (1 a 5)** $\rightarrow$ **Início do Ritual**
+Para instruções de gameplay, arquétipos e regras de jogo, consulte o [GUIA_DE_COMO_JOGAR.md](GUIA_DE_COMO_JOGAR.md).
 
 ---
 
-## As 5 Bênçãos Divinas Pré-Ritual
+## 🎥 Demonstração Visual
 
-1. **Bênção do Fogo Perpétuo:**
-   - Velas que chegam a `0 turnos` **não se extinguem de imediato**; entram em estado de **Brasa Latente** por **+1 rodada extra** de sobrevida antes de apagar definitivamente.
+### 🖼️ Tela Inicial
+![Tela Inicial do Ritual das 6 Velas](tela%20inicial.gif)
 
-2. **Bênção dos Passos Silenciosos:**
-   - Reduz a velocidade de aproximação da criatura em **35%**, mantendo o cerco das sombras contido por mais tempo e ampliando o raio de visão na penumbra.
-
-3. **Bênção da Abundância Ancestral:**
-   - Concede **40% de chance** no Altar Central de forjar **Velas Douradas Consagradas** (que queimam pelo **dobro da duração normal** da pilastra).
-
-4. **Bênção da Sincronia Cósmica:**
-   - Ao renovar uma vela em qualquer pilastra, se a **pilastra espelhada oposta** (E1 $\leftrightarrow$ D1, E2 $\leftrightarrow$ D2, E3 $\leftrightarrow$ D3) estiver acesa, **ambas ganham +2 turnos de queima sincronizada**.
-
-5. **Bênção do Segundo Fôlego:**
-   - Uma única vez por partida, ao apagar todas as 6 velas, o Altar detona uma onda de luz que **reacende 3 pilastras aleatórias (+5t)** e transporta o jogador ao centro.
-   - *Penalidade de Exaustão:* O Altar Central fica **exausto por 3 turnos**, impossibilitando reabastecer velas durante esse período.
+### 🎮 Exemplo de Gameplay
+<video src="exemplo%20de%20gameplay.mp4" width="100%" controls></video>
 
 ---
 
-## Os 5 Arquétipos de Persona
+## 1. Arquitetura do Sistema & Padrões de Projeto
 
-1. **O Zelador (Guardião das Brasas — Manutenção & Estabilidade):**
-   - **Passiva (Pavio Consagrado):** Ao reacender uma pilastra apagada, concede **+2 turnos extras** de queima inicial.
-   - **Ativa [Q] (Reserva de Emergência):** Reabastece 1 vela diretamente no bolso sem ir ao altar (Recarga: 25 turnos).
+O projeto adota uma arquitetura inspirada em **MVC (Model-View-Controller)** com forte desacoplamento entre simulação lógica, renderização gráfica e síntese sonora:
 
-2. **O Ocultista (Mestre dos Rituais — Afinidade Espiritual & Sombras):**
-   - **Passiva (Ressonância Astral):** Recarga acelerada de artefatos (Cruz ativa com 2 velas, Lanterna com 1 turno parado, Câmera +1 carga, Bolsa com 65% de chance de encantamento).
-   - **Ativa [Q] (Prece da Luz):** Sacrifica 1 vela do inventário para repelir imediatamente a criatura por 3 turnos (Recarga: 20 turnos).
+```
+                  ┌─────────────────────────────────┐
+                  │             main.py             │
+                  │ (Game Loop, Eventos & FSM)      │
+                  └───────────────┬─────────────────┘
+                                  │
+         ┌────────────────────────┼────────────────────────┐
+         │                        │                        │
+         ▼                        ▼                        ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│  game_engine.py  │    │   renderer.py    │    │ sound_manager.py │
+│ (Lógica & Turnos)│    │(Pipeline Gráfico)│    │(Áudio Procedural)│
+└────────┬─────────┘    └────────┬─────────┘    └──────────────────┘
+         │                       │
+         ▼                       │
+┌──────────────────┐             │
+│    models.py     │◄────────────┘
+│ (Modelos & Dados)│
+└──────────────────┘
+```
 
-3. **O Andarilho (Passos nas Trevas — Mobilidade & Fuga):**
-   - **Passiva (Passo Leve):** **40% de probabilidade** de se mover entre pilastras vizinhas da mesma coluna **sem gastar turnos** (ação livre de movimento).
-   - **Ativa [Q] (Sprint de Fuga):** Teletransporta-se instantaneamente de qualquer pilastra para o Altar Central com custo 0 de turnos (Recarga: 25 turnos).
-
-4. **Aprendiz de Paladino (Espada da Luz — Expurgo Sagrado & Piso de Turnos):**
-   - **Passiva (Vontade Inabalável):** Cada criatura expurgada eleva **permanentemente o piso de turnos mínimos das velas (+1t por expurgo)**, amortecendo as perdas no ritual.
-   - **Ativa [Q] (Julgamento Sagrado):** Expurga permanentemente 1 criatura das sombras, reduzindo o cerco da ameaça e aumentando a duração mínima das velas (Recarga: 30 turnos).
-
-5. **Nascido da Lua (Filho do Crepúsculo — Poder na Penumbra):**
-   - **Passiva (Afinidade Lunar):** Sob penumbra (com **3 ou menos velas acesas**), ganha **+2 turnos extras** de queima ao trocar velas e **50% de probabilidade** de realizar movimentos furtivos com custo 0 de turnos.
-   - **Ativa [Q] (Eclipse Prateado):** Sob penumbra (<= 3 velas acesas), canaliza a luz da Lua e **congela o tempo de queima de todas as velas restantes por 2 rodadas completas** (Recarga: 25 turnos).
-
----
-
-## Os 5 Artefatos Sagrados & Tecnológicos
-
-1. **Cruz de Prata (Defesa & Ressurreição):**
-   - *Bênção Radiante:* +1 turno bônus a todas as velas trocadas.
-   - *Ressurreição Sagrada:* Ao apagar todas as 6 velas, explode em luz e **reacende 2 pilastras com fogo sagrado (+4t cada)**.
-   - *Recarga:* Recarregada com 3 velas acesas (2 velas para o Ocultista).
-
-2. **Lampião Espectral (Sustentação Tática & Visão):**
-   - A chama da pilastra onde o jogador estiver **não consome turnos** (congelada no tempo).
-   - Emite aura azul-celeste própria que expande o campo de visão.
-
-3. **Câmera Fotográfica Retrô (Flash de Sobrevivência):**
-   - Possui **6 cargas de flash** (7 para o Ocultista).
-   - Permite agir na escuridão total (0 velas acesas) gastando 1 carga por ação para ofuscar as criaturas.
-
-4. **Bolsa Verde Musgo (Alquimia & Identificação por Cores):**
-   - Expande a capacidade do inventário para **4 velas**.
-   - Encanta velas no altar por cor:
-     - 🟢 **Verde Esmeralda (Chama Maior):** +4 turnos extras de queima.
-     - 🔵 **Ciano Etéreo (Ação Livre):** Troca de vela com custo 0 de turnos.
-     - 🟣 **Púrpura Mística (Altar Adjacente):** Estende a pilastra vizinha em +3 turnos.
-
-5. **Lanterna Moderna (Feixe de Longo Alcance & Recarga por Repouso):**
-   - **9 cargas de bateria** e seletor de potência (`-` e `+`) no HUD.
-   - Dispara feixes à distância sem gastar turnos.
-   - **Recarga por Repouso:** Ficar parado por 2 turnos (1 turno para o Ocultista) recupera **+3 cargas de bateria**.
-   - **Super Queima:** Velas com mais de 10 turnos travam o decaimento por 2 rodadas.
+### Padrões de Projeto Utilizados:
+* **Finite State Machine (FSM):** Gerencia transições entre telas (`MENU`, `PERSONA_SELECT`, `ARTIFACT_SELECT`, `BLESSING_SELECT`, `RITUAL_SUMMARY`, `PLAYING`, `UPGRADES`, `SETTINGS`, `GAME_OVER`).
+* **Model-View-Controller (MVC):** `models.py` (Dados puros), `renderer.py` (View desacoplada que aceita superfícies/estados), `game_engine.py` (Controller/Regras de domínio).
+* **Flyweight & Data Classes:** Encantamentos, velas e modificadores de arquétipos encapsulados em instâncias leves.
+* **Observer / Callback Hooking:** Notificações de eventos e gatilhos de sobrevida/ressurreição desacoplados.
 
 ---
 
-## Regras de Troca de Velas & Travas de Ação
+## 2. Estrutura Modular dos Componentes
 
-- **Troca Única por Visita:** Ao chegar a uma pilastra, o jogador só pode substituir a vela **uma única vez por visita**. 
-- Tentativas subsequentes na mesma pilastra sem se mover para outro ponto são bloqueadas, prevenindo perdas acidentais de velas e turnos.
+| Módulo | Responsabilidade Técnica | Principais Classes & Funções |
+| :--- | :--- | :--- |
+| [`main.py`](main.py) | Ponto de entrada, loop principal a 60 FPS, despacho de eventos (teclado/mouse), interpolação de delta time e controle da FSM. | `main()`, `toggle_screen_mode()` |
+| [`game_engine.py`](game_engine.py) | Mecânicas de jogo, regras de queima dinâmica, turnos de espera, travas de ação por visita, sinergias de arquétipo e vitória/derrota. | `GameEngine` |
+| [`models.py`](models.py) | Estruturas de dados das entidades: pilastras, velas, itens, arquétipos, artefatos, bênçãos e a criatura da penumbra. | `Pillar`, `Candle`, `Player`, `Artifact`, `Persona`, `Blessing`, `Creature`, `CandleItem` |
+| [`renderer.py`](renderer.py) | Pipeline visual completo: iluminação subtrativa 2D, renderização da vidraça gótica, nuvens em paralaxe, feixes volumétricos, interpolações e HUD. | `Renderer` |
+| [`sound_manager.py`](sound_manager.py) | Sintetizador de áudio 8-bits baseado em NumPy e Pygame Sound, gerando ondas quadradas, dente de serra e ruído proceduralmente sem arquivos de mídia externos. | `SoundManager` |
+| [`constants.py`](constants.py) | Dicionários de cores hex/RGB, posições dos nós do salão, constantes de estado, mapeamento de dificuldades e metas de vitória. | `PILLAR_POSITIONS`, `get_target_victory_turns()` |
 
 ---
 
-## Controles
+## 3. Pipeline de Renderização & Iluminação 2D
 
-- `1` a `6` / `Clique Esquerdo`: Mover até a Pilastra
-- `Q` / `Botão HUD`: Usar Habilidade Ativa do Arquétipo
-- `Clique Direito` / `Shift + 1..6`: Disparar feixe da Lanterna Moderna
-- `C` ou `0`: Mover para o Altar Central / Reabastecer
-- `Espaço` / `Enter` / `R` / `E`: Trocar vela na pilastra atual
-- `-` / `+`: Ajustar potência da Lanterna Moderna
-- `W`: Esperar um turno
-- `Setas` / `WASD`: Navegação direcional
-- `F11`: Alternar Tela Cheia / Janela
-- `ESC`: Voltar ao Menu
+A renderização do gameplay em [`renderer.py`](renderer.py) é executada em camadas estritas (*render passes*) para garantir fidelidade visual, sombras dinâmicas e efeitos de pós-processamento:
 
-## Instalação e Execução
+```
+[Fill Background]
+       │
+       ▼
+[Draw Floor & Corridors]
+       │
+       ▼
+[Draw Gothic Window (Céu, Lua/Sol, Nuvens Parallax, Moldura em Arco)]
+       │
+       ▼
+[Draw Altar & 6 Pillars]
+       │
+       ▼
+[Draw Particles & Player Sprite]
+       │
+       ▼
+[Draw Subtractive Lighting & Encroaching Creature Eyes]
+       │
+       ▼
+[Draw Window Volumetric Beams (God Rays / Moonbeams)]
+       │
+       ▼
+[Draw Special FX (Camera Flash, Silver Burst, Purge Burst, Laser Beam)]
+       │
+       ▼
+[Draw HUD & Compendium Modals]
+```
+
+### Iluminação Subtrativa com Alpha Blending
+Para simular a escuridão do salão e o campo de visão das chamas:
+1. Uma superfície de escuridão opaca `dark_surf` preenche toda a tela com cor base `(8, 12, 20, base_darkness)`.
+2. Para cada vela acesa, gera-se uma superfície radial com gradiente de luz e aplica-se `special_flags=pygame.BLEND_RGBA_SUB`.
+3. Fontes de luz adicionais (Altar, Lampião, Feixes) subtraem a escuridão em tempo real, criando iluminação dinâmica com círculos de luz suaves.
+
+### Vidraça & Nuvens Procedurais
+* **Geometria de Máscara:** Arco semicircular esticado recortado através de `pygame.draw.ellipse` e `pygame.draw.rect` aplicado com `BLEND_RGBA_MIN`.
+* **Paralaxe Contínuo:** Três camadas de nuvens (`cloud_col_back`, `cloud_col_mid`, `cloud_col_fore`) deslocadas por funções lineares contínuas moduladas no tempo (`t = time_elapsed`), operando a 60 FPS independentemente do avanço de turnos do jogador.
+* **Trajetória Celestial:** A posição da Lua é calculada por interpolação parabólica `(x, y) = f(prog, t)`:
+  $$x = 50 + \text{prog} \cdot (W - 100) + 7 \cdot \sin(0.7t)$$
+  $$y = 92 - 44 \cdot \sin(\text{prog} \cdot \pi) + 4 \cdot \cos(0.5t)$$
+
+---
+
+## 4. Síntese de Áudio Procedural
+
+O módulo [`sound_manager.py`](sound_manager.py) sintetiza todos os efeitos sonoros da partida em tempo de execução via **NumPy**, sem depender de arquivos `.wav` ou `.mp3` no disco:
+
+* **Taxa de Amostragem:** $22.050\text{ Hz}$, $16\text{-bit signed mono}$.
+* **Formas de Onda:**
+  * **Onda Quadrada (Square):** $\text{sign}(\sin(2\pi f t))$
+  * **Onda Dente de Serra (Sawtooth):** $2(f t - \lfloor f t + 0.5 \rfloor)$
+  * **Onda Senoidal Pura (Sine):** $\sin(2\pi f t)$
+  * **Ruído Branco (Noise):** Distribuição uniforme $U(-1, 1)$
+* **Envelopes ADSR:** Modulação linear e exponencial de amplitude para evitar estalos (*clicks*) e conferir textura sonora retro/8-bits.
+
+---
+
+## 5. Mecânicas de Simulação & Queima
+
+A simulação de turnos em [`game_engine.py`](game_engine.py) opera de forma determinística:
+
+1. **Decaimento Dinâmico:** A cada ação que consome turno, as velas ativas reduzem em $1$ turno de queima (exceto sob travas de congelamento como *Lampião Espectral*, *Eclipse Prateado* ou *Super Queima da Lanterna*).
+2. **Piso Mínimo de Duração:** Ao reacender uma pilastra, a nova duração é calculada dinamicamente:
+   $$\text{duração} = \max(\text{min\_floor}, \text{base\_burn} - \text{extinguished\_count} + \text{bonuses})$$
+3. **Aproximação da Criatura:**
+   $$\text{target\_proximity} = \frac{\max(0, \text{extinguished} - \text{purged})}{6} \times \text{stealth\_rate}$$
+   O deslocamento dos olhos das criaturas no salão interpola continuamente em direção ao Altar Central via aproximação assintótica.
+
+---
+
+## 6. Instalação, Execução & Requisitos
+
+### Pré-requisitos
+* Python 3.9 ou superior
+* Pip
+
+### Dependências
+As dependências do projeto estão listadas em [`requirements.txt`](requirements.txt):
+* `pygame>=2.5.0`
+* `numpy>=1.24.0`
+
+### Instalação & Execução
 
 ```bash
+# 1. Clone o repositório ou navegue até a pasta do projeto:
+cd "jogo de 6 velas"
+
+# 2. Instale as dependências:
 pip install -r requirements.txt
+
+# 3. Inicie o jogo:
 python main.py
+```
+
+---
+
+## 7. Testes Automatizados & Verificação Headless
+
+O jogo suporta execução de testes automatizados e benchmarks em modo *headless* (sem display físico ou servidor X11) através do driver virtual SDL:
+
+```bash
+python -c "
+import os
+os.environ['SDL_VIDEODRIVER'] = 'dummy'
+import pygame, constants, game_engine, renderer
+
+pygame.init()
+screen = pygame.display.set_mode((1000, 700))
+eng = game_engine.GameEngine('CROSS', constants.PERSONA_CARETAKER, constants.DIFFICULTY_NORMAL, constants.BLESSING_FIRE)
+rend = renderer.Renderer(screen)
+rend.render_gameplay(eng, (500, 350))
+print('Simulação Headless executada com sucesso!')
+"
 ```
